@@ -17,6 +17,7 @@ import traceback
 import sys
 import os
 import random
+import requests
 
 from datetime import datetime
 from PyQt5.QtWidgets import *
@@ -158,7 +159,7 @@ class WindowClass(QMainWindow, ui_layout_class):
         self.main_thread = PintrestCrawler(self,self.member_id,self.password, self.searchword, self.scrollNum)
         self.main_thread.log.connect(self.set_log)
         self.main_thread.finished.connect(self.working_finished)
-        self.main_thread.start()
+        self.main_thread.run()
 
         self.set_log('Started!')
     
@@ -339,7 +340,15 @@ class PintrestCrawler(QThread):
                 csv_writer.writerow(["Image URL"])
 
                 # 이미지 URL을 CSV 파일에 쓰기
-                for url in self.all_urls:
+                for url in self.all_urls:          ### EDIT 아래와 같은 형식이 되어야 한다.
+                    '''
+                    image_urls = [
+                        "https://i.pinimg.com/236x/9c/f1/7f/9cf17fd9b82ab0de67f226b9a06a65c6.jpg",
+                        "https://i.pinimg.com/236x/cf/a4/3a/cfa43a9d0fc0adee88ac941ce6a6362a.jpg",
+                        "https://i.pinimg.com/236x/10/ad/cf/10adcfdc64e44b2fcbe5868155de84b9.jpg",
+                        "https://i.pinimg.com/236x/d7/63/d2/d763d27e03ee8e3fb859a79c3ebb9e81.jpg"
+                    ]
+                    '''
                     csv_writer.writerow([url])
 
             self.log.emit(f"이미지 URL이 {csv_file_name} 파일로 내보내졌습니다.")
@@ -349,12 +358,37 @@ class PintrestCrawler(QThread):
             logging.error(error_message)
             logging.info(error_message)
             self.log.emit(error_message)
-       
+    
+    def convert_img_to_jpg(self):
+        # 이미지를 저장할 폴더 생성
+        if not os.path.exists('downloaded_images'):
+            os.makedirs('downloaded_images')
+
+        # 이미지 다운로드 및 저장
+        for index, image_url in enumerate(self.all_urls, start=1):
+            response = requests.get(image_url)
+            if response.status_code == 200:
+                # 이미지를 바이너리 모드로 저장
+                with open(f'downloaded_images/image{index}.jpg', 'wb') as f:
+                    f.write(response.content)
+                msg = f'이미지 {index} 다운로드 및 저장 완료'
+                self.log.emit(msg)
+                print(msg)
+            else:
+                msg = f'이미지 {index} 다운로드 실패'
+                self.log.emit(msg)
+                print(msg)
+
+        msg = '모든 이미지 다운로드 및 저장 완료'
+        self.log.emit(msg)
+        print(msg)
+
     # 주요 함수의 실행부분     
     def run(self):
         try:
             self.login_to_pintrest()
             self.load_searching_result()
+            self.convert_img_to_jpg()
         
         except:
             error = traceback.format_exc()
